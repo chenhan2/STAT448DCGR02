@@ -1,0 +1,14 @@
+---
+title: "STAT448 DCGR02"
+author: "Chenhan Xu"
+date: "12/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRUE)
+```
+
+```{r library}
+library(data.table)
+```
