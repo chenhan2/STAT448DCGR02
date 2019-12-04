@@ -1,6 +1,6 @@
 ---
 title: "STAT448 DCGR02"
-author: "Chenhan Xu"
+author: "Atharv Pathak (atharvp2), Yixuan Li (li208), Charles Xu (chenhan2)"
 date: "12/4/2019"
 output: html_document
 ---
@@ -10,5 +10,42 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, cache = TRU
 ```
 
 ```{r library}
-library(data.table)
+library(dplyr)
+library(tidyverse)
+library(purrr)
+library(readxl)
+library(ggplot2)
 ```
+
+```{r, eval = FALSE}
+dat = read.csv("https://uofi.box.com/shared/static/9elozjsg99bgcb7gb546wlfr3r2gc9b7.csv")
+crime = read_excel("Dimension Data - Crimes.xlsx")
+```
+
+```{r, eval = FALSE}
+colnames(dat)[colnames(dat) == 'CHARGE.STATUTE'] = 'Statute'
+dat = merge(x = dat, y = crime, key = "Statute", all.x = TRUE)
+dat[, c(31:34)] = sapply(dat[, c(31:34)], as.character)
+dat[, c(31:34)] = sapply(dat[, c(31:34)], as.numeric)
+dat$Hours_New = dat$Days.in.Jail * 24 + dat$Hours + dat$Minutes / 60 + dat$Seconds / 3600
+dat = dat[-which(is.na(dat$Hours_New)), ]
+dat$BOOKING.NUMBER = as.character(dat$BOOKING.NUMBER)
+colnames(dat)[colnames(dat) == 'Super-high level'] = 'Super_Level'
+colnames(dat)[colnames(dat) == 'FA Desc'] = 'FA_Desc'
+dat_s = dat %>%
+  select(c(EMPLOYMENT.STATUS, JACKET.NUMBER, PRISONER.TYPE, RELEASED.REASON, CRIME.CODE, CITY, RACE, SEX, CITIZENSHIP, MARITIAL.STATUS, MILITARY, OCCUPATION, SCHOOL, Age.at.Arrest, Hours_New, Super_Level, FA_Desc))
+```
+
+```{r, eval = FALSE}
+write.csv(dat_s, file = "CCSO_trans.csv")
+```
+
+```{r}
+dat = read_csv("CCSO_trans.csv")
+```
+
+```{r}
+dat = na.omit(dat)
+View(dat)
+```
+
