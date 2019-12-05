@@ -15,6 +15,8 @@ library(tidyverse)
 library(purrr)
 library(readxl)
 library(ggplot2)
+library(randomForest)
+library(caret)
 ```
 
 ```{r, eval = FALSE}
@@ -46,6 +48,50 @@ dat = read_csv("CCSO_trans.csv")
 
 ```{r}
 dat = na.omit(dat)
-View(dat)
+dat = dat %>%
+  select(-X1)
 ```
+
+```{r}
+names(dat)
+```
+
+```{r}
+dat$EMPLOYMENT.STATUS = as.factor(dat$EMPLOYMENT.STATUS)
+dat$PRISONER.TYPE = as.factor(dat$PRISONER.TYPE)
+dat$RELEASED.REASON = as.factor(dat$RELEASED.REASON)
+dat$CRIME.CODE = as.factor(dat$CRIME.CODE)
+dat$CITY = as.factor(dat$CITY)
+dat$RACE = as.factor(dat$RACE)
+dat$SEX = as.factor(dat$SEX)
+dat$CITIZENSHIP = as.factor(ifelse(dat$CITIZENSHIP == "US", "US", "non-US"))
+dat$MARITIAL.STATUS = as.factor(dat$MARITIAL.STATUS)
+dat$MILITARY = as.factor(dat$MILITARY)
+dat$OCCUPATION = as.factor(dat$OCCUPATION)
+dat$SCHOOL = as.factor(dat$SCHOOL)
+dat$FA_Desc = as.factor(dat$FA_Desc)
+dat$Super_Level = as.factor(dat$Super_Level)
+```
+
+```{r}
+length(levels(dat$OCCUPATION))
+```
+
+```{r}
+mod = train(Hours_New ~ EMPLOYMENT.STATUS + FA_Desc + RELEASED.REASON + RACE + SEX + MARITIAL.STATUS + MILITARY + Age.at.Arrest, data = dat, tuneGrid = expand.grid(mtry = c(2, 4, 6)))
+```
+
+```{r}
+ggplot(dat, aes(x = as.factor(Super_Level), y = Hours_New)) +
+  geom_boxplot()
+```
+```{r}
+dat_vio = dat %>%
+  select(Super_Level = "violent")
+ggplot(dat_vio, mapping = aes(Hours_New, fill = FA_Desc) +
+  geom_boxplot()
+```
+
+
+
 
