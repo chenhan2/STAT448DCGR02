@@ -17,6 +17,9 @@ library(readxl)
 library(ggplot2)
 library(randomForest)
 library(caret)
+library(devtools)
+library(ggbiplot)
+library(rpart)
 ```
 
 ```{r, eval = FALSE}
@@ -57,41 +60,134 @@ names(dat)
 ```
 
 ```{r}
-dat$EMPLOYMENT.STATUS = as.factor(dat$EMPLOYMENT.STATUS)
-dat$PRISONER.TYPE = as.factor(dat$PRISONER.TYPE)
-dat$RELEASED.REASON = as.factor(dat$RELEASED.REASON)
-dat$CRIME.CODE = as.factor(dat$CRIME.CODE)
-dat$CITY = as.factor(dat$CITY)
-dat$RACE = as.factor(dat$RACE)
-dat$SEX = as.factor(dat$SEX)
-dat$CITIZENSHIP = as.factor(ifelse(dat$CITIZENSHIP == "US", "US", "non-US"))
-dat$MARITIAL.STATUS = as.factor(dat$MARITIAL.STATUS)
-dat$MILITARY = as.factor(dat$MILITARY)
-dat$OCCUPATION = as.factor(dat$OCCUPATION)
-dat$SCHOOL = as.factor(dat$SCHOOL)
-dat$FA_Desc = as.factor(dat$FA_Desc)
-dat$Super_Level = as.factor(dat$Super_Level)
+dat$EMPLOYMENT.STATUS = as.integer(as.factor(dat$EMPLOYMENT.STATUS))
+dat$PRISONER.TYPE = as.integer(as.factor(dat$PRISONER.TYPE))
+dat$RELEASED.REASON = as.integer(as.factor(dat$RELEASED.REASON))
+dat$CRIME.CODE = as.integer(as.factor(dat$CRIME.CODE))
+dat$CITY = as.integer(as.factor(dat$CITY))
+dat$RACE = as.integer(as.factor(dat$RACE))
+dat$SEX = as.integer(as.factor(dat$SEX))
+dat$CITIZENSHIP = as.integer(as.factor(ifelse(dat$CITIZENSHIP == "US", "US", "non-US")))
+dat$MARITIAL.STATUS = as.integer(as.factor(dat$MARITIAL.STATUS))
+dat$MILITARY = as.integer(as.factor(dat$MILITARY))
+dat$OCCUPATION = as.integer(as.factor(dat$OCCUPATION))
+dat$SCHOOL = as.integer(as.factor(dat$SCHOOL))
+dat$FA_Desc = as.integer(as.factor(dat$FA_Desc))
+dat$Super_Level = as.integer(as.factor(dat$Super_Level))
 ```
 
 ```{r}
 length(levels(dat$OCCUPATION))
 ```
 
-```{r}
-mod = train(Hours_New ~ EMPLOYMENT.STATUS + FA_Desc + RELEASED.REASON + RACE + SEX + MARITIAL.STATUS + MILITARY + Age.at.Arrest, data = dat, tuneGrid = expand.grid(mtry = c(2, 4, 6)))
+```{r, eval = FALSE}
+mod = randomForest(Hours_New ~ EMPLOYMENT.STATUS + FA_Desc + RELEASED.REASON + RACE + SEX + MARITIAL.STATUS + MILITARY + Age.at.Arrest, data = dat, mtry = 4, ntree = 50)
 ```
 
 ```{r}
-ggplot(dat, aes(x = as.factor(Super_Level), y = Hours_New)) +
-  geom_boxplot()
+dat1 = select(dat, )
+ggplot(dat, aes(x = as.factor(Super_Level), y = Hours_New, fill = Super_Level, colour = Super_Level)) +
+  geom_boxplot() +
+  xlab("Crime Category") +
+  ylab("Hours in Jail") +
+  ggtitle("Distribution of Time in Jail among Different Crime Categories") +
+  ylim(c(0, 2000)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) 
 ```
+
 ```{r}
-dat_vio = dat %>%
-  select(Super_Level = "violent")
-ggplot(dat_vio, mapping = aes(Hours_New, fill = FA_Desc) +
-  geom_boxplot()
+ggplot(dat, aes(x = Age.at.Arrest, y = Hours_New, color = as.factor(Super_Level))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+dat2 = select(dat, - Hours_New)
+dat2 = scale(dat2, center = TRUE, scale = TRUE)
+dat_pca = prcomp(dat2)
 ```
 
 
+```{r}
+plot(dat_pca, type = "lines")
+```
+
+```{r}
+score = data.frame(dat_pca$x)
+index = sample(nrow(score), 1000)
+score = score[index,]
+ggplot(data = score, aes(x = PC1, y = PC2, label = rownames(score))) +
+  geom_hline(yintercept = 0, colour = "gray65") +
+  geom_vline(xintercept = 0, colour = "gray65") +
+  geom_point(colour = "tomato", alpha = 0.8, size = 1) +
+  ggtitle("PCA Plot")
+```
+
+```{r}
+new_dat = data.frame(dat_pca$x[, 1:6])
+new_dat$Hours_New = dat$Hours_New
+```
+
+
+```{r}
+mod = rpart(Hours_New ~ EMPLOYMENT.STATUS + FA_Desc + RELEASED.REASON + RACE + SEX + MARITIAL.STATUS + MILITARY + Age.at.Arrest, data = dat, cp = 0)
+```
+
+```{r}
+# split data
+index = sample(nrow(dat), 0.5 * nrow(dat))
+train = dat[index,]
+test = dat[- index,]
+
+# pca on train data
+train_scale = scale(select(train, - Hours_New), center = TRUE, scale = TRUE)
+train_pca = prcomp(train_scale)
+new_train = data.frame(Hours_New = train$Hours_New, train_pca$x)
+
+# construct decision based on pca results of train
+model = rpart(Hours_New ~ ., data = new_train, cp = 0)
+
+# convert test data to pca
+test_pca = predict(train_pca, newdata = test)
+test_pca = data.frame(test_pca)
+
+# make prediction
+pred_hours = predict(model, test_pca)
+
+sqrt(mean((pred_hours - test$Hours_New)^2))
+```
+
+```{r}
+predicted = data.frame(Hours = pred_hours, type = "predicted")
+actual = data.frame(Hours = test$Hours_New, type = "actual")
+value = rbind(predicted, actual)
+value$type = as.factor(value$type)
+ggplot(value, aes(Hours, fill = type)) +
+  geom_histogram(alpha = 0.7, position = "dodge") +
+  xlim(c(0,5000)) +
+  ggtitle("Predicted vs Actual Hours in Jail")
+  
+```
+
+```{r}
+# split data
+index = sample(nrow(dat), 0.5 * nrow(dat))
+train = dat[index,]
+test = dat[- index,]
+
+mod = rpart(Hours_New ~ ., data = train)
+pred_hours = predict(mod, test)
+sqrt(mean((pred - test$Hours_New)^2))
+```
+
+```{r}
+predicted = data.frame(Hours = pred_hours, type = "predicted")
+actual = data.frame(Hours = test$Hours_New, type = "actual")
+value = rbind(predicted, actual)
+value$type = as.factor(value$type)
+ggplot(value, aes(Hours, fill = type)) +
+  geom_histogram(alpha = 0.7, position = "dodge") +
+  xlim(c(0,5000)) +
+  ggtitle("Predicted vs Actual Hours in Jail")
+```
 
 
